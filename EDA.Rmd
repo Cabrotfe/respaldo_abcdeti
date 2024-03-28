@@ -1,0 +1,351 @@
+---
+title: "Proyecto"
+author: "Cristian Brotfeld"
+date: "2024-01-25"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+pacman::p_load(haven, tidyverse, cNORM,ggpubr,naniar)
+```
+
+```{r}
+dat = read_spss(file = "ABCedeti_2.0.sav")
+```
+
+
+```{r}
+#vector = dat_vel$Velden_fig_tiempo
+#grupo = dat_vel$Curso
+#nombre_prueba = "vel"
+#id = dat_vel$id
+#width = 1
+#k = 3
+#t = 3
+#cursos = 0:2
+#puntajes = seq(0,100000,1000)
+
+
+norma = function(vector, grupo, width,k,t,nombre_prueba,id = id, cursos,puntajes){
+  
+  modelo = cnorm(raw = vector, group = grupo, width = width,k = k,t = t)
+  datos_norm = modelo$data %>% select(percentile,normValue)
+  colnames(datos_norm) = c(str_c("perc.",nombre_prueba), str_c("t.",nombre_prueba))
+  datos_norm$id = id
+  
+  ## Además, hacer la tabla de normas:
+  
+  tabla_percentil = data.frame(puntajes)
+  tabla_t = data.frame(puntajes)
+  for(i in cursos){
+       raw =  puntajes
+       puntaje.t = data.frame(t = round(cNORM::predictNorm(raw = puntajes, A = i, model = modelo),1))
+       percentil = data.frame(perc = pnorm(puntaje.t$t,50,10))
+       percentil$perc = round(percentil$perc,3)
+       percentil$perc = percentil$perc*100
+       names(percentil)[1] = str_c(nombre_prueba,".perc.",i)
+       names(puntaje.t)[1] = str_c(nombre_prueba,".t.",i)
+       tabla_percentil = data.frame(cbind(tabla_percentil,percentil))
+       tabla_t = data.frame(cbind(tabla_t,puntaje.t))
+  }
+  
+  resultados = list(tabla_percentil = tabla_percentil, tabla_t = tabla_t, datos_norm = datos_norm)
+  return(resultados)
+}
+```
+
+
+# Datos perdidos:
+
+```{r}
+dat %>% select(11:34) %>% naniar::gg_miss_var()
+dat = dat %>% mutate(id = row_number())
+```
+
+
+# Valocicad de denominación:
+
+
+velocidad de denominación de figuras, velocidad de denominación de colores y velocidad de denominación de números.
+Es norma inferencial y los cursos son 0, 1, 2
+
+Las normas se realizarán quitando a quienes tienen 5 o más errores
+
+## Distribución general de la subpruebas:
+
+```{r}
+dat_vel = dat %>%  select(id, Curso, Velden_fig_tiempo, Velden_col_tiempo, Velden_num_tiempo, Velden_fig_err, Velden_col_err, Velden_num_err) %>% filter(Velden_fig_err < 5, Velden_num_err < 5, Velden_col_err < 5, Curso <= 2) 
+```
+
+
+```{r fig.width=10,fig.height=8}
+my_comparisons <- list( c("Velden_fig_tiempo", "Velden_col_tiempo"), c("Velden_fig_tiempo", "Velden_num_tiempo"), c("Velden_col_tiempo", "Velden_num_tiempo"))
+
+dat_vel %>% select(Curso,Velden_fig_tiempo, Velden_col_tiempo, Velden_num_tiempo) %>% gather(key=prueba,value = puntaje, 2:4) %>% filter(puntaje > 0) %>%  ggboxplot(x="Curso", y="puntaje",color = "prueba", palette = "jco")
+```
+
+
+
+```{r fig.width=10,fig.height=8}
+dat_vel %>% select(Curso,Velden_fig_tiempo, Velden_col_tiempo, Velden_num_tiempo) %>% gather(key=prueba,value = puntaje, 2:4) %>% ggecdf(x="puntaje",color = "prueba", fill = "prueba",palette = "jco") + facet_wrap(~Curso)
+```
+
+
+## Norma inferencial de subpruebas de velocidad de denominación
+
+
+```{r}
+vel_fig = norma(vector = dat_vel$Velden_fig_tiempo, grupo = dat_vel$Curso,width = 1,k = 3,t = 3,nombre_prueba = "Vel_fig",id = dat_vel$id,cursos = 0:2,puntajes = seq(0,84000,1000))
+vel_col = norma(vector = dat_vel$Velden_col_tiempo, grupo = dat_vel$Curso,width = 1,k = 3,t = 3,nombre_prueba = "Vel_col",id = dat_vel$id,cursos = 0:2,puntajes = seq(0,84000,1000))
+vel_num = norma(vector = dat_vel$Velden_num_tiempo, grupo = dat_vel$Curso,width = 1,k = 3,t = 3,nombre_prueba = "Vel_num",id = dat_vel$id,cursos = 0:2,puntajes = seq(0,84000,1000))
+```
+
+
+
+```{r}
+# base para hacer los generales:
+# Invertí los puntajes, de modo que mayor puntaje es más rpaído (no más lento)
+t_fig = (-1*(vel_fig$datos_norm$t.Vel_fig-50)) + 50
+t_col = (-1*(vel_col$datos_norm$t.Vel_col-50)) + 50
+t_num = (-1*(vel_num$datos_norm$t.Vel_num-50)) + 50
+id = dat_vel$id
+curso = dat_vel$Curso
+t_vel = data.frame(cbind(id,curso, t_fig, t_col, t_num))
+```
+
+
+
+## Normas globales de velocidad de denominación:
+
+
+```{r}
+t_vel$vel_fig_col = rowMeans(t_vel[,3:4])
+t_vel$vel_fig_num = rowMeans(t_vel[,c(3,5)])
+t_vel$vel_col_num = rowMeans(t_vel[,c(4:5)])
+t_vel$vel_total = rowMeans(t_vel[,c(3:5)])
+```
+
+
+```{r}
+t_vel %>% select(curso, vel_fig_col, vel_fig_num, vel_col_num,vel_total) %>% gather(key=indice, value=puntaje, 2:5) %>% 
+  ggpubr::ggdensity(x="puntaje",color = "indice", fill = "indice",palette = "jco", add="mean") + facet_wrap(~curso)
+```
+
+
+```{r}
+shapiro.test(t_vel$vel_fig_col)
+shapiro.test(t_vel$vel_fig_num)
+shapiro.test(t_vel$vel_col_num)
+shapiro.test(t_vel$vel_total)
+```
+
+
+```{r}
+norma_compuestos = function(mean, sd, seq){
+  puntaje_compuesto = seq
+  percentil = round(pnorm(seq, mean = mean, sd = sd)*100,1)
+  puntaje.t = qnorm(percentil/100, mean = mean, sd = sd)
+  return(data.frame(puntaje_compuesto, percentil, puntaje.t))
+}
+```
+
+## Tablas de velocidad:
+
+
+```{r}
+vel_fig_percentil = vel_fig$tabla_percentil
+vel_fig_percentil$Vel_fig.perc.0 = (1-vel_fig_percentil$Vel_fig.perc.0)
+vel_fig_percentil$Vel_fig.perc.1 = (1-vel_fig_percentil$Vel_fig.perc.1)
+vel_fig_percentil$Vel_fig.perc.2 = (1-vel_fig_percentil$Vel_fig.perc.2)
+
+vel_num_percentil = vel_num$tabla_percentil
+vel_num_percentil$Vel_num.perc.0 = (1-vel_num_percentil$Vel_num.perc.0)
+vel_num_percentil$Vel_num.perc.1 = (1-vel_num_percentil$Vel_num.perc.1)
+vel_num_percentil$Vel_num.perc.2 = (1-vel_num_percentil$Vel_num.perc.2)
+
+vel_col_percentil = vel_col$tabla_percentil
+vel_col_percentil$Vel_col.perc.0 = (1-vel_col_percentil$Vel_col.perc.0)
+vel_col_percentil$Vel_col.perc.1 = (1-vel_col_percentil$Vel_col.perc.1)
+vel_col_percentil$Vel_col.perc.2 = (1-vel_col_percentil$Vel_col.perc.2)
+
+
+vel_fig_t = vel_fig$tabla_t
+vel_fig_t$Vel_fig.t.0 = round(-1*(vel_fig_t$Vel_fig.t.0-50)+50,1)
+vel_fig_t$Vel_fig.t.1 = round(-1*(vel_fig_t$Vel_fig.t.1-50)+50,1)
+vel_fig_t$Vel_fig.t.2 = round(-1*(vel_fig_t$Vel_fig.t.2-50)+50,1)
+
+vel_num_t = vel_num$tabla_t
+vel_num_t$Vel_num.t.0 = round(-1*(vel_num_t$Vel_num.t.0-50)+50,1)
+vel_num_t$Vel_num.t.1 = round(-1*(vel_num_t$Vel_num.t.1-50)+50,1)
+vel_num_t$Vel_num.t.2 = round(-1*(vel_num_t$Vel_num.t.2-50)+50,1)
+
+vel_col_t = vel_col$tabla_t
+vel_col_t$Vel_col.t.0 = round(-1*(vel_col_t$Vel_col.t.0-50)+50,1)
+vel_col_t$Vel_col.t.1 = round(-1*(vel_col_t$Vel_col.t.1-50)+50,1)
+vel_col_t$Vel_col.t.2 = round(-1*(vel_col_t$Vel_col.t.2-50)+50,1)
+```
+
+
+```{r}
+comp_vel_fig_col = norma_compuestos(mean = mean(t_vel$vel_fig_col), sd = sd(t_vel$vel_fig_col), seq = seq(20,80,1))
+comp_vel_fig_num = norma_compuestos(mean = mean(t_vel$vel_fig_num), sd = sd(t_vel$vel_fig_num), seq = seq(20,80,1))
+comp_vel_col_num = norma_compuestos(mean = mean(t_vel$vel_col_num), sd = sd(t_vel$vel_col_num), seq = seq(20,80,1))
+comp_vel_total = norma_compuestos(mean = mean(t_vel$vel_total), sd = sd(t_vel$vel_total), seq = seq(20,80,1))
+```
+
+
+
+# CF:
+
+
+```{r}
+cf = dat %>% select(id, Curso, starts_with("CF"))
+```
+
+
+La prueba de segmentación de sílabas está mala, hay que corregir los puntajes
+
+```{r}
+cf = cf %>% filter(Curso <= 2)
+silin = norma(vector = cf$CF_silini, grupo = cf$Curso,width = 1,k = 3,t = 3,nombre_prueba = "silin",id = cf$id,cursos = 0:2,puntajes = 0:6)
+silfin = norma(vector = cf$CF_silfin, grupo = cf$Curso,width = 1,k = 3,t = 3,nombre_prueba = "silfin",id = cf$id,cursos = 0:2,puntajes = 0:6)
+
+sonfin = norma(vector = cf$CF_sonfin, grupo = cf$Curso,width = 1,k = 3,t = 3,nombre_prueba = "sonfin",id = cf$id,cursos = 0:2,puntajes = 0:6)
+sonini = norma(vector = cf$CF_sonini, grupo = cf$Curso,width = 1,k = 3,t = 3,nombre_prueba = "sonini",id = cf$id,cursos = 0:2,puntajes = 0:6)
+sinfon = norma(vector = cf$CF_sinfon, grupo = cf$Curso,width = 1,k = 1,t = 2,nombre_prueba = "sinfon",id = cf$id,cursos = 0:2,puntajes = 0:12)
+```
+
+
+Falta ver el tema de los puntajes compuestos.
+
+
+# Principio alfabético
+
+
+```{r}
+pa = dat %>% select(id, Curso, PA_Grafemas, PA_son, PA_nom) %>% filter(Curso<= 2)
+```
+
+
+```{r}
+pa %>% gather(key=prueba,value=puntaje, 3:5) %>% ggplot(aes(x=prueba,y=puntaje, fill=factor(Curso))) + geom_boxplot() + theme_bw()
+```
+
+
+```{r}
+graf = norma(vector = pa$PA_Grafemas, grupo = pa$Curso, width = 1, t=3, k=3,nombre_prueba = "graf",id = pa$id,cursos = 0:2,puntajes = 0:12)
+sonidos = norma(vector = pa$PA_son, grupo = pa$Curso, width = 1, t=2, k=1,nombre_prueba = "sonidos",id = pa$id,cursos = 0:2,puntajes = 0:12)
+nombres = norma(vector = pa$PA_nom, grupo = pa$Curso, width = 1, t=2, k=1,nombre_prueba = "nombres",id = pa$id,cursos = 0:2,puntajes = 0:12)
+```
+
+Compuestos
+
+```{r}
+base_sonidos = sonidos$datos_norm
+base_nombres = nombres$datos_norm
+base_graf = graf$datos_norm
+base_norm_PA = cbind(base_sonidos, t.nombres= base_nombres$t.nombres, t.grafema = base_graf$t.graf)
+ids = dat %>% select(id, Curso)
+base_norm_PA = base_norm_PA %>% left_join(ids)
+
+base_norm_PA$promedio_nom_son = rowMeans(base_norm_PA[,c(2,4)])
+base_norm_PA$promedio_nom_son_graf = rowMeans(base_norm_PA[,c(2,4,5)])
+```
+
+
+
+
+Está complicado hacer las normas de PA
+
+```{r}
+base_norm_PA %>% select(Curso,promedio_nom_son, promedio_nom_son_graf) %>% gather(key=prueba,value=puntaje, 2:3) %>% 
+  ggplot(aes(x=puntaje, fill=factor(Curso))) + geom_density(alpha=.5) +facet_wrap(~prueba) + theme_bw()
+```
+
+
+
+# Comprensión Oral:
+
+
+```{r}
+co = dat %>% select(id, Curso, CO) %>% filter(Curso<= 3)
+```
+
+
+```{r}
+co %>% ggplot(aes(y=CO, x = Curso, fill=factor(Curso))) + geom_boxplot() + theme_bw()
+```
+
+
+
+```{r}
+co_norma = norma(vector = co$CO, grupo = co$Curso, width = 1, t=2, k=2,nombre_prueba = "co",id = co$id,cursos = 0:3,puntajes = 0:9)
+```
+
+```{r}
+co_norma$tabla_percentil
+co_norma$tabla_t
+```
+
+
+
+
+
+# Lectura de palabras:
+
+
+```{r}
+palabras = dat %>% select(id, Curso, LP_1,LPS_2) %>% filter(Curso > 1)
+```
+
+
+```{r}
+palabras %>% gather(key=prueba,value=puntaje, 3:4) %>% ggplot(aes(x=prueba,y=puntaje, fill=factor(Curso))) + geom_boxplot() + theme_bw()
+```
+
+
+
+```{r}
+lect_pal = norma(vector = palabras$LP_1, grupo = palabras$Curso, width = 1, t=2, k=1,nombre_prueba = "lectura_palabras",id = palabras$id,cursos = 2:5,puntajes = 0:50)
+lect_pseudo = norma(vector = palabras$LPS_2, grupo = palabras$Curso, width = 1, t=3, k=1,nombre_prueba = "lectura_pseudo",id = palabras$id,cursos = 2:5,puntajes = 0:50)
+```
+
+
+
+```{r}
+lect_pal$tabla_percentil
+lect_pal$tabla_t
+
+lect_pseudo$tabla_percentil
+lect_pseudo$tabla_t
+```
+
+
+
+
+```{r}
+
+```
+
+
+
+
+
+
+```{r eval=FALSE}
+fig_col = data.frame()
+for(i in 0:2){
+ raw =  seq(0,100000,1000)
+ percentil = pnorm(cNORM::predictNorm(raw = seq(0,100000,1000), A = i, model = norm_fig_col),50,10)
+ dat = data.frame(cbind(i,raw, percentil))
+ fig_col = bind_rows(fig_col,dat)
+}
+```
+
+
+
+
+

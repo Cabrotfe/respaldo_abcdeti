@@ -1,0 +1,193 @@
+---
+title: "Proyecto"
+author: "Cristian Brotfeld"
+date: "2024-01-25"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+pacman::p_load(haven, tidyverse, cNORM,ggpubr,naniar)
+```
+
+```{r}
+dat = read_spss(file = "ABCedeti_2.0 (3).sav")
+dat = dat %>% mutate(id = row_number())
+segs = dat %>%  select(starts_with("CF_segsil_0"))
+dat$CF_segsil_total = rowSums(segs)
+dat$comprension_lectora = dat$CLT_total + dat$CLF_total
+```
+
+Paso 1: generar los criterios y utilizar primero básico.
+
+Los criterios van a ser, total de comprensión lectora y total de fluidez, utilizando solo 1ro básico.
+
+
+```{r}
+dat_1ro = dat %>% filter(Curso == 2) %>% select(comprension_lectora,
+                                  Velden_fig_tiempo,Velden_col_tiempo, Velden_num_tiempo,
+                                  CF_segsil_total,CF_silini_total,CF_silfin_total,CF_sonini_total,CF_sonfin_total,CF_sinfon_total,
+                                  RG_total, CL_son_Total, CL_nom_Total,
+                                  CO_total,
+                                  LP_total, LPS_total,
+                                  CLF_total, CLT_total,
+                                  FL_tiempo,FL_corr)
+```
+
+
+```{r}
+cor_cl = data.frame(correlacion_promedio = cor(dat_1ro)[-1,1])
+cor_cl$subprueba = rownames(cor_cl)
+cor_cl$Prueba = "Comprensión lectora"
+dat_1ro_fluidez = dat_1ro %>% filter(FL_corr >= 30)
+cor_fluidez = data.frame(correlacion_promedio = cor(dat_1ro_fluidez)[19,-19])
+cor_fluidez$subprueba = rownames(cor_fluidez)
+cor_fluidez$Prueba = "Tiempo fluidez"
+base_correlaciones = cor_fluidez %>% bind_rows(cor_cl)
+base_correlaciones %>% ggpubr::ggbarplot(x="subprueba",y="correlacion_promedio", fill = "Prueba", position = position_dodge()) + coord_flip()
+```
+
+La decisión es tomar la comprensión lectora como criterio para hacer los puntos de corte
+
+```{r}
+distribucion = ecdf(dat_1ro$comprension_lectora)
+distribucion(9)
+distribucion(15)
+dat_1ro = dat_1ro %>% mutate(grupo_habilidad = case_when(
+  comprension_lectora <= 9~"Inferior",
+  comprension_lectora >= 15~"Superior",
+  comprension_lectora > 9 & comprension_lectora < 15~"Medio"
+))
+dat_1ro %>% count(grupo_habilidad)
+```
+
+
+Tomamos al 30% de menor desempeño y al 30% de mayor desempeño. Los grupos en cantidad de personas son parecidos:
+
+
+
+```{r}
+dat_1ro_hab = dat_1ro %>% filter(grupo_habilidad %in% c("Inferior","Superior")) %>% select(grupo_habilidad,Velden_fig_tiempo, Velden_col_tiempo, Velden_num_tiempo,
+                       CF_segsil_total,CF_silini_total,CF_silfin_total,CF_sonini_total,CF_sonfin_total,CF_sinfon_total,
+                       RG_total, CL_son_Total, CL_nom_Total,
+                                  CO_total,
+                                  LP_total, LPS_total,
+                                  CLF_total, CLT_total,
+                                  FL_tiempo,FL_corr)
+```
+
+
+```{r fig.width=10, fig.height=8}
+dat_1ro_hab %>% gather(key=prueba, value=puntaje, 2:ncol(dat_1ro_hab)) %>% ggplot(aes(x=grupo_habilidad, y=puntaje)) +
+  geom_boxplot() + facet_wrap(~prueba, scales = "free")
+```
+
+
+Donde se pueden hacer puntos de corte basados en la relación con el desmepeño en comprensión lectora:
+
+Conciencia fonológica:
+
+Sílaba final
+Sílaba inicial
+Síntesis fónica
+Sonido final
+Sonido inicial
+
+No funcionó en segmentación silábica.
+
+
+Principio alfabético:
+
+Reconocimiento de grafemas
+Reconocimiento de sonidos
+Reconocimiento de nombres
+
+Comprensión oral
+
+
+Lectura de palabras:
+
+Lectura de palabras
+Lectura de pseudopalabras
+
+
+Comprension lectora:
+
+Comprension lectora de frases
+Comprension lectora de textos
+
+
+Fluidez tiempo
+
+Velocidad:
+
+No funciona para velocidad
+
+
+Partir con aquellos casos en que sí hay diferencias entre los grupos
+
+```{r}
+vector_real = ifelse(dat_1ro_hab$grupo_habilidad == "Superior",1,0)
+predicho = ifelse(dat_1ro_hab$CF_silini_total >= 1, 1,0)
+```
+
+
+
+
+```{r}
+analisis_sens = function(real, predicho, puntos){
+  ajustes = data.frame()
+  puntos = puntos
+  for(i in puntos){
+      pred = ifelse(predicho >= i, 1,0)
+      tabla = table(real,pred)
+      vn = tabla[1]
+      vp = tabla[4]
+      fn = tabla[2]
+      fp = tabla[3]
+      sensibilidad = vp/(vp+fn)
+      print(sensibilidad)
+      especificidad = vn/(vn+fp)
+      exactitud = (vp+vn)/(vp+vn+fp+fn)
+      precision = (vp)/(vp+fp)
+      f1 = (2*precision*sensibilidad)/(precision+sensibilidad)
+      dat = data.frame(cbind(i,sensibilidad,especificidad,exactitud,precision,f1))
+      ajustes = ajustes %>% bind_rows(dat)
+  }
+  return(ajustes)
+}
+
+```
+
+
+## Análisis de sensibilidad y especificidad por subprueba:
+
+### CF sílaba inicial:
+
+```{r}
+analisis_sens(vector_real, dat_1ro_hab$CF_silini_total, puntos = 1:6)
+```
+
+Valor propuesto es de 4 puntos
+
+
+```{r}
+dat %>% filter(Curso <= 2) %>% ggplot(aes(y=CF_silini_total, x=factor(Curso))) + geom_boxplot() + theme_bw() + geom_hline(yintercept = 4, linetype = 2)
+```
+
+
+
+### CF sílaba inicial:
+
+```{r}
+analisis_sens(vector_real, dat_1ro_hab$CF_silini_total, puntos = 1:6)
+```
+
+Valor propuesto es de 4 puntos
+
+
+```{r}
+dat %>% filter(Curso <= 2) %>% ggplot(aes(y=CF_silini_total, x=factor(Curso))) + geom_boxplot() + theme_bw() + geom_hline(yintercept = 4, linetype = 2)
+```
