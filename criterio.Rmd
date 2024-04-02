@@ -79,58 +79,71 @@ dat_1ro_hab = dat_1ro %>% filter(grupo_habilidad %in% c("Inferior","Superior")) 
 ```
 
 
-```{r fig.width=10, fig.height=8}
+```{r fig.width=10, fig.height=10}
 dat_1ro_hab %>% gather(key=prueba, value=puntaje, 2:ncol(dat_1ro_hab)) %>% ggplot(aes(x=grupo_habilidad, y=puntaje)) +
-  geom_boxplot() + facet_wrap(~prueba, scales = "free")
+  geom_boxplot(fill = "steelblue") + facet_wrap(~prueba, scales = "free") + theme_bw()
 ```
 
 
 Donde se pueden hacer puntos de corte basados en la relación con el desmepeño en comprensión lectora:
 
-Conciencia fonológica:
+**Conciencia fonológica:**
+
 
 Sílaba final
+
 Sílaba inicial
+
 Síntesis fónica
+
 Sonido final
+
 Sonido inicial
 
 No funcionó en segmentación silábica.
 
 
-Principio alfabético:
+**Principio alfabético:**
+
 
 Reconocimiento de grafemas
+
 Reconocimiento de sonidos
+
 Reconocimiento de nombres
 
 Comprensión oral
 
 
-Lectura de palabras:
+**Lectura de palabras:**
 
 Lectura de palabras
+
 Lectura de pseudopalabras
 
 
-Comprension lectora:
+**Comprension lectora:**
 
 Comprension lectora de frases
+
 Comprension lectora de textos
 
 
-Fluidez tiempo
+**Fluidez tiempo**
 
-Velocidad:
+
+**Velocidad:**
+
 
 No funciona para velocidad
+
 
 
 Partir con aquellos casos en que sí hay diferencias entre los grupos
 
 ```{r}
 vector_real = ifelse(dat_1ro_hab$grupo_habilidad == "Superior",1,0)
-predicho = ifelse(dat_1ro_hab$CF_silini_total >= 1, 1,0)
+#predicho = ifelse(dat_1ro_hab$CF_silini_total >= 1, 1,0)
 ```
 
 
@@ -148,7 +161,6 @@ analisis_sens = function(real, predicho, puntos){
       fn = tabla[2]
       fp = tabla[3]
       sensibilidad = vp/(vp+fn)
-      print(sensibilidad)
       especificidad = vn/(vn+fp)
       exactitud = (vp+vn)/(vp+vn+fp+fn)
       precision = (vp)/(vp+fp)
@@ -174,20 +186,263 @@ Valor propuesto es de 4 puntos
 
 
 ```{r}
-dat %>% filter(Curso <= 2) %>% ggplot(aes(y=CF_silini_total, x=factor(Curso))) + geom_boxplot() + theme_bw() + geom_hline(yintercept = 4, linetype = 2)
+dat %>% filter(Curso <= 2) %>% mutate(Clasificacion = ifelse(CF_silini_total >= 4, "alto","bajo")) %>%
+  count(Curso,Clasificacion) %>% group_by(Curso) %>% mutate(prop = round(n/sum(n),3)) %>% 
+  filter(Clasificacion == "alto") %>% 
+  ggplot(aes(y=prop, x=factor(Curso))) + geom_col(fill="steelblue",color="black") + theme_bw() +
+  labs(x="Curso", title = "Porcentaje que alcanza nivel alto") + geom_text(aes(label = prop), vjust=2)
 ```
 
 
 
-### CF sílaba inicial:
+### CF sílaba final:
 
 ```{r}
-analisis_sens(vector_real, dat_1ro_hab$CF_silini_total, puntos = 1:6)
+analisis_sens(vector_real, dat_1ro_hab$CF_silfin_total, puntos = 1:6)
 ```
 
 Valor propuesto es de 4 puntos
 
 
 ```{r}
-dat %>% filter(Curso <= 2) %>% ggplot(aes(y=CF_silini_total, x=factor(Curso))) + geom_boxplot() + theme_bw() + geom_hline(yintercept = 4, linetype = 2)
+dat %>% filter(Curso <= 2) %>% mutate(Clasificacion = ifelse(CF_silfin_total >= 4, "alto","bajo")) %>%
+  count(Curso,Clasificacion) %>% group_by(Curso) %>% mutate(prop = round(n/sum(n),3)) %>% 
+  filter(Clasificacion == "alto") %>% 
+  ggplot(aes(y=prop, x=factor(Curso))) + geom_col(fill="steelblue",color="black") + theme_bw() +
+  labs(x="Curso", title = "Porcentaje que alcanza nivel alto") + geom_text(aes(label = prop), vjust=2)
 ```
+
+
+
+### CF sonido inicial:
+
+```{r}
+analisis_sens(vector_real, dat_1ro_hab$CF_sonini_total, puntos = 1:6)
+```
+
+Valor propuesto es de 4 puntos
+
+
+```{r}
+dat %>% filter(Curso <= 2) %>% mutate(Clasificacion = ifelse(CF_sonini_total >= 4, "alto","bajo")) %>%
+  count(Curso,Clasificacion) %>% group_by(Curso) %>% mutate(prop = round(n/sum(n),3)) %>% 
+  filter(Clasificacion == "alto") %>% 
+  ggplot(aes(y=prop, x=factor(Curso))) + geom_col(fill="steelblue",color="black") + theme_bw() +
+  labs(x="Curso", title = "Porcentaje que alcanza nivel alto") + geom_text(aes(label = prop), vjust=2)
+```
+
+
+
+### CF sonido final:
+
+```{r}
+analisis_sens(vector_real, dat_1ro_hab$CF_sonfin_total, puntos = 1:6)
+```
+
+Valor propuesto es de 4 puntos
+
+
+```{r}
+dat %>% filter(Curso <= 2) %>% mutate(Clasificacion = ifelse(CF_sonfin_total >= 4, "alto","bajo")) %>%
+  count(Curso,Clasificacion) %>% group_by(Curso) %>% mutate(prop = round(n/sum(n),3)) %>% 
+  filter(Clasificacion == "alto") %>% 
+  ggplot(aes(y=prop, x=factor(Curso))) + geom_col(fill="steelblue",color="black") + theme_bw() +
+  labs(x="Curso", title = "Porcentaje que alcanza nivel alto") + geom_text(aes(label = prop), vjust=2)
+```
+
+
+
+### CF síntesis fónica:
+
+```{r}
+analisis_sens(vector_real, dat_1ro_hab$CF_sinfon_total, puntos = 1:6)
+```
+
+Valor propuesto es de 4 puntos
+
+
+```{r}
+dat %>% filter(Curso <= 2) %>% mutate(Clasificacion = ifelse(CF_sinfon_total >= 4, "alto","bajo")) %>%
+  count(Curso,Clasificacion) %>% group_by(Curso) %>% mutate(prop = round(n/sum(n),3)) %>% 
+  filter(Clasificacion == "alto") %>% 
+  ggplot(aes(y=prop, x=factor(Curso))) + geom_col(fill="steelblue",color="black") + theme_bw() +
+  labs(x="Curso", title = "Porcentaje que alcanza nivel alto") + geom_text(aes(label = prop), vjust=2)
+```
+
+
+
+
+### CF síntesis fónica:
+
+```{r}
+analisis_sens(vector_real, dat_1ro_hab$CF_segsil_total, puntos = 1:6)
+```
+
+No hay valor propuesto, pero para seguir la lógica podría ser de 4 puntos
+
+
+```{r}
+dat %>% filter(Curso <= 2) %>% mutate(Clasificacion = ifelse(CF_sinfon_total >= 4, "alto","bajo")) %>%
+  count(Curso,Clasificacion) %>% group_by(Curso) %>% mutate(prop = round(n/sum(n),3)) %>% 
+  filter(Clasificacion == "alto") %>% 
+  ggplot(aes(y=prop, x=factor(Curso))) + geom_col(fill="steelblue",color="black") + theme_bw() +
+  labs(x="Curso", title = "Porcentaje que alcanza nivel alto") + geom_text(aes(label = prop), vjust=2)
+```
+
+
+
+
+
+## Principio alfabético:
+
+### Reconocimiento de grafemas
+
+```{r}
+analisis_sens(vector_real, dat_1ro_hab$RG_total, puntos = 1:12)
+```
+
+Habría que poner un valor muy alto, pero no tiene mucho sentido. Se nota que en prekinder y kinder no saben reconocer grafemas y en primero sí
+
+
+```{r}
+dat %>% filter(Curso <= 2) %>% mutate(Clasificacion = ifelse(RG_total >= 8, "alto","bajo")) %>%
+  count(Curso,Clasificacion) %>% group_by(Curso) %>% mutate(prop = round(n/sum(n),3)) %>% 
+  filter(Clasificacion == "alto") %>% 
+  ggplot(aes(y=prop, x=factor(Curso))) + geom_col(fill="steelblue",color="black") + theme_bw() +
+  labs(x="Curso", title = "Porcentaje que alcanza nivel alto") + geom_text(aes(label = prop), vjust=2)
+```
+
+
+### Reconocimiento de sonidos:
+
+
+```{r}
+analisis_sens(vector_real, dat_1ro_hab$CL_son_Total, puntos = 1:12)
+```
+
+Habría que poner un valor muy alto, pero no tiene mucho sentido. Se nota que en prekinder y kinder no saben reconocer grafemas y en primero sí
+
+
+```{r}
+dat %>% filter(Curso <= 2) %>% mutate(Clasificacion = ifelse(CL_son_Total >= 12, "alto","bajo")) %>%
+  count(Curso,Clasificacion) %>% group_by(Curso) %>% mutate(prop = round(n/sum(n),3)) %>% 
+  filter(Clasificacion == "alto") %>% 
+  ggplot(aes(y=prop, x=factor(Curso))) + geom_col(fill="steelblue",color="black") + theme_bw() +
+  labs(x="Curso", title = "Porcentaje que alcanza nivel alto") + geom_text(aes(label = prop), vjust=2)
+```
+
+
+
+### Reconocimiento de nombres:
+
+
+```{r}
+analisis_sens(vector_real, dat_1ro_hab$CL_nom_Total, puntos = 1:12)
+```
+
+Habría que poner un valor muy alto, pero no tiene mucho sentido. Se nota que en prekinder y kinder no saben reconocer grafemas y en primero sí
+
+
+```{r}
+dat %>% filter(Curso <= 2) %>% mutate(Clasificacion = ifelse(CL_nom_Total >= 12, "alto","bajo")) %>%
+  count(Curso,Clasificacion) %>% group_by(Curso) %>% mutate(prop = round(n/sum(n),3)) %>% 
+  filter(Clasificacion == "alto") %>% 
+  ggplot(aes(y=prop, x=factor(Curso))) + geom_col(fill="steelblue",color="black") + theme_bw() +
+  labs(x="Curso", title = "Porcentaje que alcanza nivel alto") + geom_text(aes(label = prop), vjust=2)
+```
+
+
+
+## Comprensión oral
+
+
+```{r}
+analisis_sens(vector_real, dat_1ro_hab$CO_total, puntos = 1:9)
+```
+
+El punto de corte sugerido es 7
+
+```{r}
+dat %>% filter(Curso <= 2) %>% mutate(Clasificacion = ifelse(CO_total >= 7, "alto","bajo")) %>%
+  count(Curso,Clasificacion) %>% group_by(Curso) %>% mutate(prop = round(n/sum(n),3)) %>% 
+  filter(Clasificacion == "alto") %>% 
+  ggplot(aes(y=prop, x=factor(Curso))) + geom_col(fill="steelblue",color="black") + theme_bw() +
+  labs(x="Curso", title = "Porcentaje que alcanza nivel alto") + geom_text(aes(label = prop), vjust=2)
+```
+
+## Lectura de palabras:
+
+### Lectura de palabras
+
+
+```{r}
+analisis_sens(vector_real, dat_1ro_hab$LP_total, puntos = 1:40)
+```
+
+El punto de corte sugerido es 22
+
+```{r}
+dat %>% mutate(Clasificacion = ifelse(LP_total >= 22, "alto","bajo")) %>%
+  count(Curso,Clasificacion) %>% group_by(Curso) %>% mutate(prop = round(n/sum(n),3)) %>% 
+  filter(Clasificacion == "alto") %>% 
+  ggplot(aes(y=prop, x=factor(Curso))) + geom_col(fill="steelblue",color="black") + theme_bw() +
+  labs(x="Curso", title = "Porcentaje que alcanza nivel alto") + geom_text(aes(label = prop), vjust=2)
+```
+
+
+
+### Lectura de pseudo palabras
+
+
+```{r}
+analisis_sens(vector_real, dat_1ro_hab$LPS_total, puntos = 1:40)
+```
+
+El punto de corte sugerido es 14
+
+```{r}
+dat %>% mutate(Clasificacion = ifelse(LPS_total >= 14, "alto","bajo")) %>%
+  count(Curso,Clasificacion) %>% group_by(Curso) %>% mutate(prop = round(n/sum(n),3)) %>% 
+  filter(Clasificacion == "alto") %>% 
+  ggplot(aes(y=prop, x=factor(Curso))) + geom_col(fill="steelblue",color="black") + theme_bw() +
+  labs(x="Curso", title = "Porcentaje que alcanza nivel alto") + geom_text(aes(label = prop), vjust=2)
+```
+
+
+
+
+## Comprensión lectora
+
+### Comprensión lectora de frases
+
+```{r}
+analisis_sens(vector_real, dat_1ro_hab$CLF_total, puntos = 1:10)
+```
+
+El punto de corte sugerido es 8
+
+```{r}
+dat %>% mutate(Clasificacion = ifelse(CLF_total >= 8, "alto","bajo")) %>%
+  count(Curso,Clasificacion) %>% group_by(Curso) %>% mutate(prop = round(n/sum(n),3)) %>% 
+  filter(Clasificacion == "alto") %>% 
+  ggplot(aes(y=prop, x=factor(Curso))) + geom_col(fill="steelblue",color="black") + theme_bw() +
+  labs(x="Curso", title = "Porcentaje que alcanza nivel alto") + geom_text(aes(label = prop), vjust=2)
+```
+
+
+### Comprensión lectora de textos
+
+```{r}
+analisis_sens(vector_real, dat_1ro_hab$CLT_total, puntos = 1:10)
+```
+
+El punto de corte sugerido es 5
+
+```{r}
+dat %>% mutate(Clasificacion = ifelse(CLF_total >= 5, "alto","bajo")) %>%
+  count(Curso,Clasificacion) %>% group_by(Curso) %>% mutate(prop = round(n/sum(n),3)) %>% 
+  filter(Clasificacion == "alto") %>% 
+  ggplot(aes(y=prop, x=factor(Curso))) + geom_col(fill="steelblue",color="black") + theme_bw() +
+  labs(x="Curso", title = "Porcentaje que alcanza nivel alto") + geom_text(aes(label = prop), vjust=2)
+```
+
