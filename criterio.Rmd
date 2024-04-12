@@ -1,10 +1,10 @@
 ---
-title: "Proyecto"
+title: "Proyecto puntos de corte ABCedeti"
 author: "Cristian Brotfeld"
 date: "2024-01-25"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -84,8 +84,9 @@ dat_1ro_hab %>% gather(key=prueba, value=puntaje, 2:ncol(dat_1ro_hab)) %>% ggplo
   geom_boxplot(fill = "steelblue") + facet_wrap(~prueba, scales = "free") + theme_bw()
 ```
 
+\newpage
 
-Donde se pueden hacer puntos de corte basados en la relación con el desmepeño en comprensión lectora:
+A partir de las diferencias entre los grupos de alto y bajo desempeño, se propone hacer análisis de sensibilidad y especificidad para las siguientes pruebas:
 
 **Conciencia fonológica:**
 
@@ -301,11 +302,11 @@ dat %>% filter(Curso <= 2) %>% mutate(Clasificacion = ifelse(CF_sinfon_total >= 
 analisis_sens(vector_real, dat_1ro_hab$RG_total, puntos = 1:12)
 ```
 
-Habría que poner un valor muy alto, pero no tiene mucho sentido. Se nota que en prekinder y kinder no saben reconocer grafemas y en primero sí
+Habría que poner un valor muy alto, pero no tiene mucho sentido. Se nota que en prekinder y kinder no saben reconocer grafemas y en primero sí, y que en el fondo hay un salto importante entre niveles. Se propone un puntaje de corte de 4 puntos solo para evitar un nivel de exigencia muy alto para prekinder y kinder
 
 
 ```{r}
-dat %>% filter(Curso <= 2) %>% mutate(Clasificacion = ifelse(RG_total >= 8, "alto","bajo")) %>%
+dat %>% filter(Curso <= 2) %>% mutate(Clasificacion = ifelse(RG_total >= 4, "alto","bajo")) %>%
   count(Curso,Clasificacion) %>% group_by(Curso) %>% mutate(prop = round(n/sum(n),3)) %>% 
   filter(Clasificacion == "alto") %>% 
   ggplot(aes(y=prop, x=factor(Curso))) + geom_col(fill="steelblue",color="black") + theme_bw() +
@@ -320,11 +321,11 @@ dat %>% filter(Curso <= 2) %>% mutate(Clasificacion = ifelse(RG_total >= 8, "alt
 analisis_sens(vector_real, dat_1ro_hab$CL_son_Total, puntos = 1:12)
 ```
 
-Habría que poner un valor muy alto, pero no tiene mucho sentido. Se nota que en prekinder y kinder no saben reconocer grafemas y en primero sí
+Habría que poner un valor muy alto, pero no tiene mucho sentido. Se nota que en prekinder y kinder no saben reconocer sonidos y en primero sí
 
 
 ```{r}
-dat %>% filter(Curso <= 2) %>% mutate(Clasificacion = ifelse(CL_son_Total >= 12, "alto","bajo")) %>%
+dat %>% filter(Curso <= 2) %>% mutate(Clasificacion = ifelse(CL_son_Total >= 4, "alto","bajo")) %>%
   count(Curso,Clasificacion) %>% group_by(Curso) %>% mutate(prop = round(n/sum(n),3)) %>% 
   filter(Clasificacion == "alto") %>% 
   ggplot(aes(y=prop, x=factor(Curso))) + geom_col(fill="steelblue",color="black") + theme_bw() +
@@ -344,7 +345,7 @@ Habría que poner un valor muy alto, pero no tiene mucho sentido. Se nota que en
 
 
 ```{r}
-dat %>% filter(Curso <= 2) %>% mutate(Clasificacion = ifelse(CL_nom_Total >= 12, "alto","bajo")) %>%
+dat %>% filter(Curso <= 2) %>% mutate(Clasificacion = ifelse(CL_nom_Total >= 5, "alto","bajo")) %>%
   count(Curso,Clasificacion) %>% group_by(Curso) %>% mutate(prop = round(n/sum(n),3)) %>% 
   filter(Clasificacion == "alto") %>% 
   ggplot(aes(y=prop, x=factor(Curso))) + geom_col(fill="steelblue",color="black") + theme_bw() +
