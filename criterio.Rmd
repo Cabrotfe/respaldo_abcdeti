@@ -18,6 +18,8 @@ dat = dat %>% mutate(id = row_number())
 segs = dat %>%  select(starts_with("CF_segsil_0"))
 dat$CF_segsil_total = rowSums(segs)
 dat$comprension_lectora = dat$CLT_total + dat$CLF_total
+dat$CO_03 = ifelse(dat$CO_03 == 0, 1,0) # corregir el error del ítem 3
+dat$CO_total = rowSums(dat[,c(109:117)])
 ```
 
 Paso 1: generar los criterios y utilizar primero básico.

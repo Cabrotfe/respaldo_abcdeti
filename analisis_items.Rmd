@@ -1,0 +1,82 @@
+---
+title: ''
+author: "Cristian Brotfeld"
+date: "2024-04-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+pacman::p_load(haven, tidyverse, cNORM,ggpubr,naniar,rebus)
+```
+
+```{r}
+dat = read_spss(file = "ABCedeti_2.0 (3).sav")
+dat = dat %>% mutate(id = row_number())
+segs = dat %>%  select(starts_with("CF_segsil_0"))
+dat$CF_segsil_total = rowSums(segs)
+dat$comprension_lectora = dat$CLT_total + dat$CLF_total
+dat$CO_03 = ifelse(dat$CO_03 == 0, 1,0) # corregir el error del ítem 3
+dat$CO_total = rowSums(dat[,c(109:117)])
+dat_1ro = dat %>% filter(Curso == 2)
+```
+
+```{r}
+ecdf_lect = ecdf(dat_1ro$comprension_lectora)
+mean(dat_1ro$comprension_lectora <= 15)
+dat_1ro$desempeño_cl = ifelse(dat_1ro$comprension_lectora <= 15,"bajo_medio","alto")
+```
+
+## Conciencia fonológica:
+
+```{r fig.width=10,fig.height=10}
+cfs = colnames(dat_1ro[str_detect(colnames(dat_1ro), pattern = START%R%"CF_"%R%one_or_more(char_class(ALPHA))%R%"_0")])
+
+dat_1ro %>% select(c("id","NSE","desempeño_cl",cfs)) %>% gather(key = prueba, value = respuesta,4:(length(cfs)+3))  %>% group_by(desempeño_cl, prueba) %>% summarise(prop = mean(respuesta)) %>%
+  mutate(categoria = str_extract(prueba, patter = "_"%R%one_or_more(char_class(ALPHA))%R%"_")) %>% 
+  ggplot(aes(x=prueba,y=prop,fill=desempeño_cl)) + geom_col(position = position_dodge(width = 0.7),alpha=0.5, color="black") + facet_wrap(~categoria, scales = "free_x") + theme_bw() +theme(axis.text.x = element_text(angle = 90)) + geom_hline(yintercept = 0.85)
+```
+
+
+## Principio alfabético:
+
+
+```{r fig.width=10,fig.height=5}
+rg = colnames(dat_1ro[str_detect(colnames(dat_1ro), pattern = START%R%"RG_"%R%one_or_more(char_class(DIGIT))%R%END)])
+
+rs = colnames(dat_1ro[str_detect(colnames(dat_1ro), pattern = START%R%"CL_son_"%R%one_or_more(char_class(DIGIT))%R%END)])
+
+rn = colnames(dat_1ro[str_detect(colnames(dat_1ro), pattern = START%R%"CL_nom_"%R%one_or_more(char_class(DIGIT))%R%END)])
+
+pa = c(rg,rs,rn)
+
+dat_1ro %>% select(c("id","NSE","desempeño_cl",pa)) %>% gather(key = prueba, value = respuesta,4:(length(pa)+3))  %>% group_by(desempeño_cl, prueba) %>% summarise(prop = mean(respuesta)) %>%
+  mutate(categoria = str_extract(prueba, patter = "_"%R%one_or_more(char_class(ALPHA))%R%"_")) %>% mutate(categoria = case_when(
+    str_detect(categoria, pattern = "_nom_")~"Rec. Nombres",
+    str_detect(categoria, pattern = "_son_")~"Rec. Sonidos",
+    is.na(categoria)~"Rec. Grafemas"
+  )) %>% 
+  ggplot(aes(x=prueba,y=prop,fill=desempeño_cl)) + geom_col(position = position_dodge(width = 0.7),alpha=0.5, color="black") + facet_wrap(~categoria, scales = "free_x") + theme_bw() +theme(axis.text.x = element_text(angle = 90)) + geom_hline(yintercept = 0.85)
+```
+
+
+## Comprensión oral:
+
+```{r fig.width=10,fig.height=5}
+co = colnames(dat_1ro[str_detect(colnames(dat_1ro), pattern = START%R%"CO_"%R%one_or_more(char_class(DIGIT))%R%END)])
+
+dat_1ro %>% select(c("id","NSE","desempeño_cl",co)) %>% gather(key = prueba, value = respuesta,4:(length(co)+3))  %>% group_by(desempeño_cl, prueba) %>% summarise(prop = mean(respuesta)) %>%
+  ggplot(aes(x=prueba,y=prop,fill=desempeño_cl)) + geom_col(position = position_dodge(width = 0.7),alpha=0.5, color="black") + theme_bw() +theme(axis.text.x = element_text(angle = 90)) + geom_hline(yintercept = 0.85)
+```
+
+
+### Lectura de palabras y de pseudopalabras:
+
+
+```{r fig.width=10,fig.height=5}
+dat_1ro %>% select(c("id","NSE","desempeño_cl",LP_total,LPS_total)) %>% gather(key = prueba, value = respuesta,4:5)  %>% group_by(desempeño_cl, prueba) %>% summarise(prop = mean(respuesta)) %>%
+  ggplot(aes(x=prueba,y=prop,fill=desempeño_cl)) + geom_col(position = position_dodge(width = 0.7),alpha=0.5, color="black") + theme_bw() +theme(axis.text.x = element_text(angle = 90)) + geom_hline(yintercept = 0.85)
+```
+
+
+

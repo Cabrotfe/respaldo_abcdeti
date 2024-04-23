@@ -14,6 +14,13 @@ pacman::p_load(haven, tidyverse, cNORM,ggpubr,naniar)
 
 ```{r}
 dat = read_spss(file = "ABCedeti_2.0 (3).sav")
+dat$CO_03 = ifelse(dat$CO_03 == 0, 1,0) # corregir el error del ítem 3
+dat$CO_total = rowSums(dat[,c(109:117)])
+```
+
+
+```{r eval=FALSE}
+dat %>% select(Curso, CO_total) %>% ggplot(aes(x=CO_total)) + geom_histogram() + facet_wrap(~factor(Curso)) + geom_vline(xintercept = 8)
 ```
 
 
@@ -754,4 +761,3 @@ datos_percentil_cat2 %>% gather(key=prueba, value=categoría, 6:ncol(datos_perce
   mutate(porc = round(n/sum(n),3)*100) %>% ungroup() %>% 
   ggplot(aes(x=Curso,y=porc,fill=categoría)) + geom_col() + facet_wrap(~prueba, scales = "free_x")
 ```
-

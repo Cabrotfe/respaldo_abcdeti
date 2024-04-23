@@ -1,0 +1,455 @@
+---
+title: "Untitled"
+author: "Cristian Brotfeld"
+date: "2024-04-12"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+pacman::p_load(haven, tidyverse, cNORM,ggpubr,naniar)
+```
+
+```{r}
+dat = read_spss(file = "ABCedeti_2.0 (3).sav")
+dat = dat %>% mutate(id = row_number())
+load("datos_percentil.RData")
+```
+
+
+## Visualización de los percentiles para ver efectos techo
+
+
+La propuesta considera utilizar puntos de corte basados en la norma para generar 3 niveles de desempeño en cada subprueba. La propuesta es considerar el percentil 25 y 75 como puntos de corte, ya que se suele utilizar en otras pruebas para definir el rango bajo el promedio, rango promedio y rango sobre el promedio. Le llamaremos nivel inferior, medio y superior por conveniencia
+
+
+
+```{r fig.width=10,fig.height=9}
+datos_percentil %>% gather(key=prueba, value=percentil, 6:ncol(datos_percentil)) %>% mutate(nivel = case_when(
+  percentil < 0.25~"inferior",
+  percentil >= 0.25 & percentil <= 0.75~"medio",
+  percentil > 0.75~"superior"
+)) %>% 
+  ggplot(aes(x=Curso, y=percentil, color = nivel)) + geom_point(position = position_jitter(width = 0.4),alpha=0.5) + facet_wrap(~prueba) + theme_bw()
+```
+
+
+
+```{r}
+datos_percentil_cat = datos_percentil %>% mutate(across(.cols = 6:22, .fns = function(x){case_when(
+  x < 0.25~"inferior",
+  x >= 0.25 & x < 0.75~"medio",
+  x >= 0.75~"superior"
+)}))
+```
+
+
+
+```{r eval=FALSE}
+colnames(datos_percentil_cat)
+```
+
+\newpage
+
+De estos resultados se puede decir que:
+
+Tenemos efecto techo e incapacidad de tener un nivel de desempeño superior en el percentil 75 para las siguientes subpruebas:
+
+Comprensión lectora de frases: cursos 2do, 3ro y 4to [perc.cl_frases]
+
+Comprensión lectora de textos: cursos 3ro y 4to [perc.cl_textos]
+
+Comprensión oral en 4to [perc.co]
+
+Principio alfabético en el reconocimiento de nombres y de sonidos en 1ro [perc.nombres] y [perc.sonidos]
+
+
+Lo que se puede hacer es ajustar en nivel de desempeño superior en estos casos, poníendole como exigencia el puntaje completo en la prueba. Esto es, asumir que en estos niveles la expectativa es tener todo correctamente respondido ya que se trata de conocimientos básicos para el nivel.
+
+
+
+```{r}
+datos_percentil_cat2 = datos_percentil %>% mutate(across(.cols = c(9:15,19:20), .fns = function(x){case_when(
+  x < 0.25~"inferior",
+  x >= 0.25 & x < 0.75~"medio",
+  x >= 0.75~"superior"
+)}))
+```
+
+
+```{r}
+datos_percentil_cat2 = datos_percentil_cat2 %>% mutate(across(.cols = c(6:8), .fns = function(x){case_when(
+  x < 0.25~"superior",
+  x >= 0.25 & x < 0.75~"medio",
+  x >= 0.75~"inferior"
+)}))
+```
+
+
+
+```{r}
+tabla_maximos = datos_percentil_cat2 %>% select(Curso, perc.cl_frases,perc.cl_textos,perc.co,perc.nombres,perc.sonidos) %>% gather(key=prueba,value=percentil,2:6) %>% group_by(Curso, prueba) %>% summarise(maximo = max(percentil))
+```
+
+En los siguientes casos el percentil máximo no es 75%:
+
+```{r}
+tabla_maximos %>% filter(maximo < 0.75) %>% knitr::kable()
+```
+
+Se utilizará para estos casos el percentil máximo como punto de corte. Esto es equivalente a decir que el puntaje máximo posible de la prueba marca el nivel superior.
+
+```{r}
+## Arreglar variable por variable:
+datos_percentil_cat2 = datos_percentil_cat2 %>% mutate(perc.nombres = case_when(
+  Curso == 2 & perc.nombres >= 0.697~"superior",
+  Curso == 2 & perc.nombres < 0.697 & perc.nombres >= 0.25 ~"medio",
+  Curso == 2 & perc.nombres < 0.25 ~"inferior",
+  ##
+  Curso != 2 & perc.nombres >= 0.75~"superior",
+  Curso != 2 & perc.nombres < 0.75 & perc.nombres >= 0.25 ~"medio",
+  Curso != 2 & perc.nombres < 0.25 ~"inferior",
+))
+```
+
+
+```{r}
+datos_percentil_cat2 = datos_percentil_cat2 %>% mutate(perc.sonidos = case_when(
+  Curso == 2 & perc.sonidos >= 0.635~"superior",
+  Curso == 2 & perc.sonidos < 0.635 & perc.sonidos >= 0.25 ~"medio",
+  Curso == 2 & perc.sonidos < 0.25 ~"inferior",
+  ##
+  Curso != 2 & perc.sonidos >= 0.75~"superior",
+  Curso != 2 & perc.sonidos < 0.75 & perc.sonidos >= 0.25 ~"medio",
+  Curso != 2 & perc.sonidos < 0.25 ~"inferior",
+))
+```
+
+
+```{r}
+datos_percentil_cat2 = datos_percentil_cat2 %>% mutate(perc.cl_frases = case_when(
+  Curso == 3 & perc.cl_frases >= 0.710 ~"superior",
+  Curso == 3 & perc.cl_frases < 0.710 & perc.cl_frases >= 0.25 ~"medio",
+  Curso == 3 & perc.cl_frases < 0.25 ~"inferior",
+  ##
+  Curso == 4 & perc.cl_frases >= 0.629~"superior",
+  Curso == 4 & perc.cl_frases < 0.629 & perc.cl_frases >= 0.25 ~"medio",
+  Curso == 4 & perc.cl_frases < 0.25 ~"inferior",
+  ##
+   Curso == 5 & perc.cl_frases >= 0.646~"superior",
+  Curso == 5 & perc.cl_frases < 0.646 & perc.cl_frases >= 0.25 ~"medio",
+  Curso == 5 & perc.cl_frases < 0.25 ~"inferior",
+  ##
+  Curso <= 2 & perc.cl_frases >= 0.75~"superior",
+  Curso <= 2 & perc.cl_frases < 0.75 & perc.cl_frases >= 0.25 ~"medio",
+  Curso <= 2 & perc.cl_frases < 0.25 ~"inferior",
+))
+```
+
+
+
+```{r}
+datos_percentil_cat2 = datos_percentil_cat2 %>% mutate(perc.cl_textos = case_when(
+  Curso == 4 & perc.cl_textos >= 0.640~"superior",
+  Curso == 4 & perc.cl_textos < 0.640 & perc.cl_textos >= 0.25 ~"medio",
+  Curso == 4 & perc.cl_textos < 0.25 ~"inferior",
+  ##
+  Curso == 5 & perc.cl_textos >= 0.636~"superior",
+  Curso == 5 & perc.cl_textos < 0.636 & perc.cl_textos >= 0.25 ~"medio",
+  Curso == 5 & perc.cl_textos < 0.25 ~"inferior",
+  ##
+  Curso <= 3 & perc.cl_textos >= 0.75~"superior",
+  Curso <= 3 & perc.cl_textos < 0.75 & perc.cl_textos >= 0.25 ~"medio",
+  Curso <= 3 & perc.cl_textos < 0.25 ~"inferior",
+))
+```
+
+
+```{r}
+datos_percentil_cat2 = datos_percentil_cat2 %>% mutate(perc.co = case_when(
+  Curso == 5 & perc.co >= 0.663~"superior",
+  Curso == 5 & perc.co < 0.663 & perc.co >= 0.25 ~"medio",
+  Curso == 5 & perc.co < 0.25 ~"inferior",
+  ##
+  Curso <= 4 & perc.co >= 0.75~"superior",
+  Curso <= 4 & perc.co < 0.75 & perc.co >= 0.25 ~"medio",
+  Curso <= 4 & perc.co < 0.25 ~"inferior",
+))
+```
+
+
+```{r fig.width=11, fig.height=11}
+datos_percentil_cat2 %>% gather(key=prueba, value=categoría, 6:ncol(datos_percentil)) %>% count(Curso,prueba,categoría) %>% filter(is.na(categoría)==FALSE) %>% group_by(Curso,prueba) %>% 
+  mutate(porc = round(n/sum(n),3)*100) %>% ungroup() %>% 
+  ggplot(aes(x=Curso,y=porc,fill=categoría)) + geom_col() + facet_wrap(~prueba, scales = "free_x") +
+  geom_text(aes(label = str_c(porc,"%")), position = position_stack(vjust=0.5),size=2.5)
+```
+
+
+
+
+## Validación de los datos:
+
+Reconocimiento de nombres
+
+
+```{r}
+table(datos_percentil_cat2$perc.cl_textos, datos_percentil_cat2$perc.nombres)
+```
+
+Reconocimiento de sonidos
+
+```{r}
+table(datos_percentil_cat2$perc.cl_textos, datos_percentil_cat2$perc.sonidos)
+```
+
+
+Reconocimiento de grafemas
+
+```{r}
+table(datos_percentil_cat2$perc.cl_textos, datos_percentil_cat2$perc.graf)
+```
+
+Comprensión oral:
+
+```{r}
+table(datos_percentil_cat2$perc.cl_textos, datos_percentil_cat2$perc.co)
+```
+
+
+Conciencia fonológica. Segmentación de sílabas:
+
+```{r}
+table(datos_percentil_cat2$perc.cl_textos, datos_percentil_cat2$perc.segsil)
+```
+
+
+Conciencia fonológica. Silaba inicial:
+
+```{r}
+table(datos_percentil_cat2$perc.cl_textos, datos_percentil_cat2$perc.silin)
+```
+
+Conciencia fonológica. Silaba final:
+
+```{r}
+table(datos_percentil_cat2$perc.cl_textos, datos_percentil_cat2$perc.silfin)
+```
+
+
+Conciencia fonológica. Sonido inicial:
+
+```{r}
+table(datos_percentil_cat2$perc.cl_textos, datos_percentil_cat2$perc.sonini)
+```
+
+
+Conciencia fonológica. Sonido final:
+
+```{r}
+table(datos_percentil_cat2$perc.cl_textos, datos_percentil_cat2$perc.sonfin)
+```
+
+
+Conciencia fonológica. Síntesis fonológica:
+
+```{r}
+table(datos_percentil_cat2$perc.cl_textos, datos_percentil_cat2$perc.sinfon)
+```
+
+Lectura de palabras:
+
+```{r}
+table(datos_percentil_cat2$perc.cl_textos, datos_percentil_cat2$perc.lectura_palabras)
+```
+
+
+Lectura de pseudopalabras:
+
+```{r}
+table(datos_percentil_cat2$perc.cl_textos, datos_percentil_cat2$perc.lectura_pseudo)
+```
+
+### Probar solo con NSE bajo:
+
+
+```{r}
+nse = dat %>% select(id, NSE)
+datos_percentil_cat2 = datos_percentil_cat2 %>% left_join(nse)
+datos_percentil_cat2_bajo = datos_percentil_cat2 %>% filter(NSE == 0)
+```
+
+
+Reconocimiento de nombres
+
+
+```{r}
+table(datos_percentil_cat2_bajo$perc.cl_textos, datos_percentil_cat2_bajo$perc.nombres)
+```
+
+Reconocimiento de sonidos
+
+```{r}
+table(datos_percentil_cat2_bajo$perc.cl_textos, datos_percentil_cat2_bajo$perc.sonidos)
+```
+
+
+Reconocimiento de grafemas
+
+```{r}
+table(datos_percentil_cat2_bajo$perc.cl_textos, datos_percentil_cat2_bajo$perc.graf)
+```
+
+Comprensión oral:
+
+```{r}
+table(datos_percentil_cat2_bajo$perc.cl_textos, datos_percentil_cat2_bajo$perc.co)
+```
+
+
+Conciencia fonológica. Segmentación de sílabas:
+
+```{r}
+table(datos_percentil_cat2_bajo$perc.cl_textos, datos_percentil_cat2_bajo$perc.segsil)
+```
+
+
+Conciencia fonológica. Silaba inicial:
+
+```{r}
+table(datos_percentil_cat2_bajo$perc.cl_textos, datos_percentil_cat2_bajo$perc.silin)
+```
+
+Conciencia fonológica. Silaba final:
+
+```{r}
+table(datos_percentil_cat2_bajo$perc.cl_textos, datos_percentil_cat2_bajo$perc.silfin)
+```
+
+
+Conciencia fonológica. Sonido inicial:
+
+```{r}
+table(datos_percentil_cat2_bajo$perc.cl_textos, datos_percentil_cat2_bajo$perc.sonini)
+```
+
+
+Conciencia fonológica. Sonido final:
+
+```{r}
+table(datos_percentil_cat2_bajo$perc.cl_textos, datos_percentil_cat2_bajo$perc.sonfin)
+```
+
+
+Conciencia fonológica. Síntesis fonológica:
+
+```{r}
+table(datos_percentil_cat2_bajo$perc.cl_textos, datos_percentil_cat2_bajo$perc.sinfon)
+```
+
+Lectura de palabras:
+
+```{r}
+table(datos_percentil_cat2_bajo$perc.cl_textos, datos_percentil_cat2_bajo$perc.lectura_palabras)
+```
+
+
+Lectura de pseudopalabras:
+
+```{r}
+table(datos_percentil_cat2_bajo$perc.cl_textos, datos_percentil_cat2_bajo$perc.lectura_pseudo)
+```
+
+
+
+
+### Probar solo con 1ro básico
+
+
+```{r}
+datos_percentil_cat2_1ro = datos_percentil_cat2 %>% filter(Curso == 2)
+```
+
+
+Reconocimiento de nombres
+
+
+```{r}
+table(datos_percentil_cat2_1ro$perc.cl_textos, datos_percentil_cat2_1ro$perc.nombres)
+```
+
+Reconocimiento de sonidos
+
+```{r}
+table(datos_percentil_cat2_1ro$perc.cl_textos, datos_percentil_cat2_1ro$perc.sonidos)
+```
+
+
+Reconocimiento de grafemas
+
+```{r}
+table(datos_percentil_cat2_1ro$perc.cl_textos, datos_percentil_cat2_1ro$perc.graf)
+```
+
+Comprensión oral:
+
+```{r}
+table(datos_percentil_cat2_1ro$perc.cl_textos, datos_percentil_cat2_1ro$perc.co)
+```
+
+
+Conciencia fonológica. Segmentación de sílabas:
+
+```{r}
+table(datos_percentil_cat2_1ro$perc.cl_textos, datos_percentil_cat2_1ro$perc.segsil)
+```
+
+
+Conciencia fonológica. Silaba inicial:
+
+```{r}
+table(datos_percentil_cat2_1ro$perc.cl_textos, datos_percentil_cat2_1ro$perc.silin)
+```
+
+Conciencia fonológica. Silaba final:
+
+```{r}
+table(datos_percentil_cat2_1ro$perc.cl_textos, datos_percentil_cat2_1ro$perc.silfin)
+```
+
+
+Conciencia fonológica. Sonido inicial:
+
+```{r}
+table(datos_percentil_cat2_1ro$perc.cl_textos, datos_percentil_cat2_1ro$perc.sonini)
+```
+
+
+Conciencia fonológica. Sonido final:
+
+```{r}
+table(datos_percentil_cat2_1ro$perc.cl_textos, datos_percentil_cat2_1ro$perc.sonfin)
+```
+
+
+Conciencia fonológica. Síntesis fonológica:
+
+```{r}
+table(datos_percentil_cat2_1ro$perc.cl_textos, datos_percentil_cat2_1ro$perc.sinfon)
+```
+
+Lectura de palabras:
+
+```{r}
+table(datos_percentil_cat2_1ro$perc.cl_textos, datos_percentil_cat2_1ro$perc.lectura_palabras)
+```
+
+
+Lectura de pseudopalabras:
+
+```{r}
+table(datos_percentil_cat2_1ro$perc.cl_textos, datos_percentil_cat2_1ro$perc.lectura_pseudo)
+```
+
